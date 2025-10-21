@@ -108,25 +108,27 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
-    glBindVertexArray(0);
-
-    GLfloat shininessValues[] = { 2, 4, 8, 16, 32, 64, 128, 256 };
+    glBindVertexArray(VAO);
 
     // Cube grid layout
     int rows = 2;
     int cols = 4;
-    float spacing = 2.0f; // distance between cubes
+    float spacing = 1.5f; // reduced from 2.5f to bring cubes closer
 
     // Calculate maximum distance from center to corner of the grid
     float maxX = (cols - 1) / 2.0f * spacing + 0.5f; // half cube included
     float maxY = (rows - 1) / 2.0f * spacing + 0.5f;
-    float maxDistance = sqrt(maxX*maxX + maxY*maxY + 0.5f*0.5f); // include cube half depth
-    float fov = 30.0f;
+    float maxDistance = sqrt(maxX*maxX + maxY*maxY + 4.0f); // adjusted for new spacing
+    float fov = 35.0f; // slightly narrower FOV since cubes are closer
     float aspect = (float)WIDTH / HEIGHT;
 
     // Position camera far enough to see all cubes
-    float cameraZ = maxDistance / tan(glm::radians(fov / 2.0f));
+    float cameraZ = 6.0f;
     glm::vec3 cameraPos(0.0f, 0.0f, cameraZ);
+
+    // Initialize shininess values (256, 128, 64, 32, 16, 8, 4, 2)
+    float shininessValues[8] = {256.0f, 128.0f, 64.0f, 32.0f, 16.0f, 8.0f, 4.0f, 2.0f};
+    int cubeIndex = 0;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -150,66 +152,27 @@ int main()
 
         glBindVertexArray(VAO);
 
-        int index = 0;
+        cubeIndex = 0; // Reset index for each frame
         for (int row = 0; row < rows; ++row)
         {
             for (int col = 0; col < cols; ++col)
             {
                 glm::mat4 model = glm::mat4(1.0f);
 
+                // Position cubes in a grid centered at (0,0,0)
                 float x = (col - (cols - 1)/2.0f) * spacing;
-                float y = (row - (rows - 1)/2.0f) * -spacing;
+                float y = (row - (rows - 1)/2.0f) * spacing; // positive Y for second row
                 float z = 0.0f;
 
                 model = glm::translate(model, glm::vec3(x, y, z));
-                model = glm::rotate(model, glm::radians(15.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                model = glm::rotate(model, glm::radians(10.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
                 glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-                glUniform1f(glGetUniformLocation(lightingShader.Program, "shininess"), shininessValues[index]);
+                glUniform1f(glGetUniformLocation(lightingShader.Program, "shininess"), shininessValues[cubeIndex++]);
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
-
-                // Render the number under the cube
-                char numStr[16];
-                sprintf(numStr, "%d", (int)shininessValues[index]);
-
-                // Transform cube position to screen space
-                glm::vec4 pos = projection * view * glm::vec4(x, y - 0.4f, z, 1.0f);
-                pos /= pos.w; // perspective divide
-
-                // Convert to normalized device coordinates (NDC -> screen)
-                float screenX = (pos.x * 0.5f + 0.5f) * WIDTH;
-                float screenY = (pos.y * 0.5f + 0.5f) * HEIGHT;
-
-                // --- Begin Text Rendering ---
-                glDisable(GL_DEPTH_TEST); // disable depth so text is on top
-
-                glMatrixMode(GL_PROJECTION);
-                glPushMatrix();
-                glLoadIdentity();
-                gluOrtho2D(0, WIDTH, 0, HEIGHT);
-
-                glMatrixMode(GL_MODELVIEW);
-                glPushMatrix();
-                glLoadIdentity();
-
-                // Flip Y axis because OpenGL 0,0 is bottom-left
-
-                glColor3f(1.0f, 1.0f, 1.0f);
-
-                RenderText(screenX, HEIGHT - screenY, numStr);
-
-                glPopMatrix();
-                glMatrixMode(GL_PROJECTION);
-                glPopMatrix();
-                glMatrixMode(GL_MODELVIEW);
-
-                glEnable(GL_DEPTH_TEST); // restore depth testing
-                // --- End Text Rendering ---
-                index++;
             }
         }
-
 
         glBindVertexArray(0);
         glfwSwapBuffers(window);
